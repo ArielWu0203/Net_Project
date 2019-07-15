@@ -34,7 +34,7 @@ class TCP_RyuApp(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         # TODO: SYN packets to CP rule.
-        match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6)
+        match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags = 0x02)
         action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
         self.add_flow(datapath,100,match,action)
         # TODO: table-miss flow entry
