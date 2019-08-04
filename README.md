@@ -20,3 +20,4 @@
 ## simple_router.py
 * h1--s1--r1--s2--h1
 ## Router_topo.py
+![image](https://github.com/ArielWu0203/Net_Project/blob/master/net.png?raw=true)
