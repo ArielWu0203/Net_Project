@@ -17,4 +17,6 @@
   ```
   $ sudo mn -c
   ```
+## simple_router.py
+* h1--s1--r1--s2--h1
 ## Router_topo.py
