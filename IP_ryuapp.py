@@ -10,21 +10,31 @@ from ryu.lib.packet import tcp
 from ryu.lib.packet import ipv4
 from ryu.lib.packet import packet
 
+
 class IP_RyuApp(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     lldp_struct = {}
-
+    temp = 0
+    
     def __init__(self,*args,**kwargs):
         super(IP_RyuApp,self).__init__(*args,**kwargs)
         self.mac_to_port = {}
         self.tcp_info = {}
 
     # TODO : Add rules.
-    def add_flow(self,datapath,priority,match,actions):
+    def add_flow(self,datapath,cookie,cookie_mask,priority,match,actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions)]
-        mod = parser.OFPFlowMod(datapath = datapath,priority = priority,match = match,instructions = inst)
+        mod = parser.OFPFlowMod(datapath = datapath,cookie=cookie,cookie_mask=cookie_mask,priority = priority,match = match,instructions = inst)
+        datapath.send_msg(mod)
+
+    # TODO : Delete rules.
+    def del_flow(self,datapath,cookie,cookie_mask):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        
+        mod = parser.OFPFlowMod(datapath = datapath,command=ofproto.OFPFC_DELETE,cookie=cookie,cookie_mask=cookie_mask,table_id=ofproto.OFPTT_ALL,out_port=ofproto.OFPP_ANY,out_group=ofproto.OFPG_ANY)
         datapath.send_msg(mod)
 
     # TODO : add rules.
@@ -37,22 +47,24 @@ class IP_RyuApp(app_manager.RyuApp):
         # TODO: SYN packets to CP rule.
         match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,ipv4_dst='10.0.0.0/25',tcp_flags=0x02)
         action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        self.add_flow(datapath,100,match,action)
+        self.add_flow(datapath,1,0,100,match,action)
+        """
         match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,ipv4_dst='10.0.0.0/25',tcp_flags=0x12)
         action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        self.add_flow(datapath,100,match,action)
+        self.add_flow(datapath,1,1,100,match,action)
         match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,ipv4_dst='10.0.0.0/25',tcp_flags=0x14)
         action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
-        self.add_flow(datapath,100,match,action)
-
+        self.add_flow(datapath,1,1,100,match,action)
+        """
         # TODO: table-miss flow entry
         match2 = parser.OFPMatch()
         action2 = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                           ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath,0,match2,action2)
+        self.add_flow(datapath,0,0,0,match2,action2)
  
     @set_ev_cls(ofp_event.EventOFPPacketIn,MAIN_DISPATCHER)
     def packet_in_handler(self,ev):
+        
         # TODO : handle packets.
         msg = ev.msg
         datapath = msg.datapath
@@ -72,7 +84,14 @@ class IP_RyuApp(app_manager.RyuApp):
             if protocol == 6:
                 pkt_tcp = pkt.get_protocol(tcp.tcp)
                 print('src=%s dst=%s bits=%s' %(pkt_ipv4.src,pkt_ipv4.dst,pkt_tcp.bits))
-
+                self.temp = self.temp + 1
+                print(self.temp)
+                if self.temp == 2:
+                    print("yes")
+                    match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,ipv4_dst='10.0.0.0/24',tcp_flags=0x02)
+                    action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+                    self.del_flow(datapath,1,0xFFFFFFFFFFFFFFFF)
+        
         dst = pkt_ether.dst
         src = pkt_ether.src
 
@@ -91,7 +110,7 @@ class IP_RyuApp(app_manager.RyuApp):
         
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port = in_port,eth_dst=dst)
-            self.add_flow(datapath,1,match,actions)
+            self.add_flow(datapath,0,0,1,match,actions)
 
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
