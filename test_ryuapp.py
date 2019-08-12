@@ -120,7 +120,7 @@ class test_RyuApp(app_manager.RyuApp):
             protocol = pkt_ipv4.proto
             if protocol == 6:
                 pkt_tcp = pkt.get_protocol(tcp.tcp)
-                print(pkt_ipv4.src,pkt_ipv4.dst,pkt_tcp.bits)
+                print(datapath.id,pkt_ipv4.src,pkt_ipv4.dst,pkt_tcp.bits)
 
         dst = pkt_ether.dst
         src = pkt_ether.src

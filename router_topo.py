@@ -21,9 +21,9 @@ def MininetTopo(argv):
 
     info("Create switch node.\n")
     s1 = net.addSwitch('s1',switch = OVSSwitch,failMode = 'secure',protocols = 'OpenFlow13')
-    s2 = net.addSwitch('s2',switch = OVSSwitch,failMode = 'secure',protocols = 'OpenFlow13')
-    s3 = net.addSwitch('s3',switch = OVSSwitch,failMode = 'secure',protocols = 'OpenFlow13')
-    s4 = net.addSwitch('s4',switch = OVSSwitch,failMode = 'secure',protocols = 'OpenFlow13')
+    s2 = net.addSwitch('s2',switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13')
+    s3 = net.addSwitch('s3',switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13')
+    s4 = net.addSwitch('s4',switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13')
 
     info("Create router node.\n")
     r1 = net.addHost('r1')
@@ -69,7 +69,8 @@ def MininetTopo(argv):
     h4.cmd("ip route add default via 10.0.1.1")
     r1.cmd("ip route add default via 10.0.3.2")
     r2.cmd("ip route add default via 10.0.3.1")
-
+    
+    h4.cmd("python -m SimpleHTTPServer 80 &")
 
     info("Run mininet CLI.\n")
     CLI(net)
