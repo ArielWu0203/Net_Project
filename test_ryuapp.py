@@ -14,7 +14,8 @@ from ryu.lib.packet import packet
 class test_RyuApp(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     lldp_struct = {}
-    
+    SA_struct = {}
+
     def __init__(self,*args,**kwargs):
         super(test_RyuApp,self).__init__(*args,**kwargs)
         self.mac_to_port = {}
@@ -55,50 +56,57 @@ class test_RyuApp(app_manager.RyuApp):
         parser = datapath.ofproto_parser
         
         # TODO: Match SYN SYN/ACK ACK packets.
-        match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02)
-        inst = [parser.OFPInstructionGotoTable(table_id=1)]
-        mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 3,match = match,instructions = inst)
-        datapath.send_msg(mod)
+        if datapath.id == 1:
+            # SYN
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02)
+            inst = [parser.OFPInstructionGotoTable(table_id=1)]
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 3,match = match,instructions = inst)
+            datapath.send_msg(mod)
 
-        match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12)
-        inst = [parser.OFPInstructionGotoTable(table_id=2)]
-        mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 2,match = match,instructions = inst)
-        datapath.send_msg(mod)
+            # SYN/ACK
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12)
+            inst = [parser.OFPInstructionGotoTable(table_id=2)]
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 3,match = match,instructions = inst)
+            datapath.send_msg(mod)
+ 
+            # ACK
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x10)
+            inst = [parser.OFPInstructionGotoTable(table_id=3)]
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 1,match = match,instructions = inst)
+            datapath.send_msg(mod)
 
-        match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x10)
-        inst = [parser.OFPInstructionGotoTable(table_id=3)]
-        mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 1,match = match,instructions = inst)
-        datapath.send_msg(mod)
+            match = parser.OFPMatch()
+            inst = [parser.OFPInstructionGotoTable(table_id=4)]
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 0,match = match,instructions = inst)
+            datapath.send_msg(mod)
 
-        match = parser.OFPMatch()
-        inst = [parser.OFPInstructionGotoTable(table_id=4)]
-        mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 0,match = match,instructions = inst)
-        datapath.send_msg(mod)
+            # TODO: syn table.
+            match = parser.OFPMatch()
+            inst = [parser.OFPInstructionGotoTable(table_id=4)]
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 0,match = match,instructions = inst)
+            datapath.send_msg(mod)
 
+            # TODO: syn/ack table.
+            match = parser.OFPMatch() 
+            action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
+                                         ofproto.OFPCML_NO_BUFFER)]
+            self.add_flow(datapath,2,0,0,0,match,action)
+ 
+            # TODO: ack table.
+            match = parser.OFPMatch()
+            inst = [parser.OFPInstructionGotoTable(table_id=4)]
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=3,priority = 0,match = match,instructions = inst)
+            datapath.send_msg(mod)
+        
         # TODO: table-miss flow entry
         match = parser.OFPMatch()
         action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
                                          ofproto.OFPCML_NO_BUFFER)]
-        self.add_flow(datapath,4,0,0,0,match,action)
-        
-        # TODO: syn table.
-        match = parser.OFPMatch()
-        inst = [parser.OFPInstructionGotoTable(table_id=4)]
-        mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 0,match = match,instructions = inst)
-        datapath.send_msg(mod)
-
-        # TODO: syn/ack table.
-        match = parser.OFPMatch()
-        inst = [parser.OFPInstructionGotoTable(table_id=4)]
-        mod = parser.OFPFlowMod(datapath = datapath,table_id=2,priority = 0,match = match,instructions = inst)
-        datapath.send_msg(mod)
-
-        # TODO: ack table.
-        match = parser.OFPMatch()
-        inst = [parser.OFPInstructionGotoTable(table_id=4)]
-        mod = parser.OFPFlowMod(datapath = datapath,table_id=3,priority = 0,match = match,instructions = inst)
-        datapath.send_msg(mod)
- 
+        if datapath.id == 1:
+            self.add_flow(datapath,4,0,0,0,match,action)
+        else :
+            self.add_flow(datapath,0,0,0,0,match,action)
+    
     @set_ev_cls(ofp_event.EventOFPPacketIn,MAIN_DISPATCHER)
     def packet_in_handler(self,ev):
         
@@ -116,11 +124,28 @@ class test_RyuApp(app_manager.RyuApp):
         if not pkt_ether:
             return
 
-        if pkt_ipv4:
+        if datapath.id == 1 and pkt_ipv4:
             protocol = pkt_ipv4.proto
             if protocol == 6:
                 pkt_tcp = pkt.get_protocol(tcp.tcp)
-                print(datapath.id,pkt_ipv4.src,pkt_ipv4.dst,pkt_tcp.bits)
+                # SYN/ACK : add rule & record the SA_struct.
+                if pkt_tcp.bits == 18:                
+                    
+                    self.SA_struct.setdefault(pkt_ipv4.dst,{})
+                    
+                    match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst=pkt_ipv4.dst)
+                    inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                    mod = parser.OFPFlowMod(datapath = datapath,table_id=2,priority = 1,match = match,instructions = inst)
+                    datapath.send_msg(mod)
+
+                    #print(self.SA_struct)
+                    
+                    match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x10,ipv4_src=pkt_ipv4.dst)
+                    inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                    mod = parser.OFPFlowMod(datapath = datapath,table_id=3,priority = 1,match = match,instructions = inst)
+                    datapath.send_msg(mod)
+
+                    #print(datapath.id,pkt_ipv4.src,pkt_ipv4.dst,pkt_tcp.bits)
 
         dst = pkt_ether.dst
         src = pkt_ether.src
@@ -139,8 +164,11 @@ class test_RyuApp(app_manager.RyuApp):
         
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(in_port = in_port,eth_dst=dst)
-            self.add_flow(datapath,4,0,0,1,match,actions)
-
+            if datapath.id == 1:
+                self.add_flow(datapath,4,0,0,1,match,actions)
+            else:
+                self.add_flow(datapath,0,0,0,1,match,actions)
+           
         data = None
         if msg.buffer_id == ofproto.OFP_NO_BUFFER:
             data = msg.data
