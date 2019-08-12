@@ -28,7 +28,6 @@ def MininetTopo(argv):
     h1 = net.addHost('h1')
     h2 = net.addHost('h2')
     h2.cmd("python -m SimpleHTTPServer 80 &")
-    h3 = net.addHost('h3')
 
     info("Create switch node.\n")
     switch = []
@@ -38,8 +37,6 @@ def MininetTopo(argv):
 
     info("Create Links.\n")
     net.addLink(h1,switch[0])
-    net.addLink(h3,switch[0])
-
     net.addLink(h2,switch[number-1])
     for i in range(number-1):
         net.addLink(switch[i],switch[i+1])

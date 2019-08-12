@@ -11,13 +11,13 @@ from ryu.lib.packet import ipv4
 from ryu.lib.packet import packet
 
 
-class IP_RyuApp(app_manager.RyuApp):
+class modify_RyuApp(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
     lldp_struct = {}
     temp = 0
     
     def __init__(self,*args,**kwargs):
-        super(IP_RyuApp,self).__init__(*args,**kwargs)
+        super(modify_RyuApp,self).__init__(*args,**kwargs)
         self.mac_to_port = {}
         self.tcp_info = {}
 
@@ -44,9 +44,8 @@ class IP_RyuApp(app_manager.RyuApp):
         parser = datapath.ofproto_parser
         
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,actions)]
-        mod = parser.OFPFlowMod(datapath = datapath,command=ofproto.OFPFC_MODIFY_STRICT,cookie=cookie,cookie_mask=cookie_mask,priority = priority,match = match,instructions = inst,table_id=0)
+        mod = parser.OFPFlowMod(datapath = datapath,command=ofproto.OFPFC_MODIFY,cookie=cookie,cookie_mask=cookie_mask,instructions = [])
 
-        print(11111111111111111111111111)
         print(mod)
         datapath.send_msg(mod)
 
