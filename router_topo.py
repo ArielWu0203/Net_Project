@@ -41,11 +41,15 @@ def MininetTopo(argv):
     net.addLink(r1,r2)
 
     info("Create Controller.\n")
-    c0 = net.addController(name = 'c0',controller = RemoteController,ip = '127.0.0.1',port = 6633)
+    c0 = net.addController(name = 'c0',controller = RemoteController,port = 6633)
 
     info("Build and start network.\n")
     net.build()
-    net.start()
+    c0.start()
+    s1.start([c0])
+    s2.start([])
+    s3.start([])
+    s4.start([])
 
     r1.cmd("ifconfig r1-eth0 0")
     r1.cmd("ifconfig r1-eth1 0")
