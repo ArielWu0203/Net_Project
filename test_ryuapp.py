@@ -23,6 +23,7 @@ class test_RyuApp(app_manager.RyuApp):
         
         self.datapaths = {}     
 
+        self.syn_table = {}
         self.sa_table = {}
         self.ack_table = {}
         ## Monitor
@@ -52,6 +53,7 @@ class test_RyuApp(app_manager.RyuApp):
                 if dp.id == 1:
                     self.sa_table.clear()
                     self.ack_table.clear()
+                    self.syn_table.clear()
                     self.del_flow(dp,1,1,0xFFFFFFFFFFFFFFFF)
                     self.del_flow(dp,2,1,0xFFFFFFFFFFFFFFFF)
                     self.del_flow(dp,3,1,0xFFFFFFFFFFFFFFFF)
@@ -125,7 +127,8 @@ class test_RyuApp(app_manager.RyuApp):
         
         keys = self.ack_table.keys()
         for ip in keys:
-            if self.ack_table[ip] == 0 and self.sa_table[ip] > 0:
+            if self.syn_table.has_key(ip) == False and self.ack_table[ip] == 0 and self.sa_table[ip] > 0:
+                self.syn_table.setdefault(ip,None)
                 print(datapath.id)
                 match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02,ipv4_src=ip)
                 inst = []
