@@ -34,7 +34,7 @@ class TCP_RyuApp(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         # TODO: SYN packets to CP rule.
-        match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags = 0x02)
+        match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6)
         action = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
         self.add_flow(datapath,100,match,action)
         # TODO: table-miss flow entry
@@ -63,9 +63,7 @@ class TCP_RyuApp(app_manager.RyuApp):
             protocol = pkt_ipv4.proto
             if protocol == 6:
                 pkt_tcp = pkt.get_protocol(tcp.tcp)
-                if pkt_tcp.has_flags(tcp.TCP_SYN):
-                    #print("syn")
-                    self.handle_tcp(datapath,in_port,pkt_ipv4,pkt_tcp)
+                print(pkt_ipv4.src,pkt_ipv4.dst,pkt_tcp.bits)
                     
 
         dst = pkt_ether.dst

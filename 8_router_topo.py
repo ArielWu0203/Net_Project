@@ -101,6 +101,9 @@ def MininetTopo(argv):
     r2.cmd("ip route add default via 12.0.3.1")
     
     server.cmd("python -m SimpleHTTPServer 80 &")
+   
+    #for i in range(0,13):
+    #    xterm(hostlist[i])
 
     info("Run mininet CLI.\n")
     CLI(net)
@@ -108,3 +111,4 @@ def MininetTopo(argv):
 if __name__ == '__main__':
     setLogLevel('info')
     MininetTopo(sys.argv[1:])
+
