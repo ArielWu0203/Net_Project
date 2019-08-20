@@ -66,7 +66,7 @@ def MininetTopo(argv):
     info("Build and start network.\n")
     net.build()
     c0.start()
-    s1.start([])
+    s1.start([c0])
     s2.start([])
     s5.start([])
 
