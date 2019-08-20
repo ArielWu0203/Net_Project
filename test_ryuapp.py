@@ -31,7 +31,7 @@ class test_RyuApp(app_manager.RyuApp):
         self.monitor_thread = hub.spawn(self._monitor)
  
         ## Clean
-        self.clean_time = 60
+        self.clean_time = 120
         self.clean_thread = hub.spawn(self._clean)
 
     @set_ev_cls(ofp_event.EventOFPStateChange,[MAIN_DISPATCHER, DEAD_DISPATCHER])
