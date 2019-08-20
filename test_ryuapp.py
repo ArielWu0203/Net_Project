@@ -163,14 +163,14 @@ class test_RyuApp(app_manager.RyuApp):
                 self.unsafe_C[temp[0]].setdefault(temp[1],{})
                 self.unsafe_C[temp[0]][temp[1]].setdefault(temp[2],{})
                 self.unsafe_C[temp[0]][temp[1]][temp[2]].setdefault(temp[3],None)
-                print("unsafe ",self.unsafe_C)
+                #print("unsafe ",self.unsafe_C)
             
             elif self.ack_table[ip] > 0 and self.sa_table[ip] >= 0:
                 self.safe_C.setdefault(temp[0],{})
                 self.safe_C[temp[0]].setdefault(temp[1],{})
                 self.safe_C[temp[0]][temp[1]].setdefault(temp[2],{})
                 self.safe_C[temp[0]][temp[1]][temp[2]].setdefault(temp[3],None)   
-                print("safe ",self.safe_C)
+                #print("safe ",self.safe_C)
             
 
             """

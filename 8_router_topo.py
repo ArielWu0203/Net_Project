@@ -6,7 +6,7 @@ from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 from mininet.node import RemoteController, OVSSwitch
 import sys, getopt
-
+import time
 
 def MininetTopo(argv):
 
@@ -99,11 +99,18 @@ def MininetTopo(argv):
     
     r1.cmd("ip route add default via 12.0.3.2")
     r2.cmd("ip route add default via 12.0.3.1")
+
+    server.cmdPrint("python -m SimpleHTTPServer 80 &")
+    time.sleep(3)
     
-    server.cmd("python -m SimpleHTTPServer 80 &")
-   
-    #for i in range(0,13):
-    #    xterm(hostlist[i])
+    hostlist[12].cmd("xterm &")
+
+    
+    while True:
+        for i in range(0,13):
+            hostlist[i].cmdPrint('curl 10.0.1.10 &')
+        time.sleep(3)
+
 
     info("Run mininet CLI.\n")
     CLI(net)
