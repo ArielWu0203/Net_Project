@@ -22,14 +22,18 @@ class test_RyuApp(app_manager.RyuApp):
         
         self.datapaths = {}     
 
-        self.syn_table = {}
+        self.fin_table = {}
         self.sa_table = {}
+        self.sa2_table = {}
         self.ack_table = {}
 
+        self.C_net = []
+        self.B_net = []
+        self.A_net = []
 
-        self.sa_max_num = 50
+        self.sa_max_num = 10
         self.unsafe_C = {}
-        self.safe = {}
+        #self.safe = {}
 
         ## Monitor
         self.time = 5
@@ -81,10 +85,14 @@ class test_RyuApp(app_manager.RyuApp):
         
         self.sa_table.clear()
         self.ack_table.clear()
+        self.fin_table.clear()
+        self.sa2_table.clear()
+        
         #self.unsafe_C.clear()
         #self.safe.clear()
 
-
+        req = parser.OFPFlowStatsRequest(datapath = datapath,table_id = 1)
+        datapath.send_msg(req)
         req = parser.OFPFlowStatsRequest(datapath = datapath,table_id = 2)
         datapath.send_msg(req)
         req = parser.OFPFlowStatsRequest(datapath = datapath,table_id = 3)
@@ -104,11 +112,25 @@ class test_RyuApp(app_manager.RyuApp):
                   "-------- "
                   "---------------- "
                   "------------ ")
-            if body[0].table_id==2 :
+            if body[0].table_id==1 :
                 for stat in sorted([flow for flow in body if flow.priority > 0],
+                                   key=lambda flow: (flow.match['ipv4_src'])):
+                    self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
+                    self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
+            elif body[0].table_id==2 :
+                for stat in sorted([flow for flow in body if flow.priority > 0 and flow.priority < 10],
                                    key=lambda flow: (flow.match['ipv4_dst'])):
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_dst'],stat.packet_count)
                     self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_dst'],stat.packet_count))
+                for stat in sorted([flow for flow in body if flow.priority > 10],
+                                   key=lambda flow: (flow.match['ipv4_dst'])):
+                    
+                    ipv4 =  stat.match['ipv4_dst']
+                    self.sa2_table.setdefault(ipv4,0)
+                    self.sa2_table[ipv4]=stat.packet_count
+                    #print("sa2_table ",self.sa2_table)
+                    self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_dst'],stat.packet_count))
+ 
             elif body[0].table_id==3:
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_src'])):
@@ -119,10 +141,15 @@ class test_RyuApp(app_manager.RyuApp):
 
     # TODO : Calculate Syn/ack & ACK
     def _collect(self,datapath,table_id,ipv4,packet_count):
-
-        if table_id == 2:
+        
+        if table_id == 1:
+            self.fin_table.setdefault(ipv4,0)
+            self.fin_table[ipv4]=packet_count
+        
+        elif table_id == 2:
             self.sa_table.setdefault(ipv4,0)
             self.sa_table[ipv4]=packet_count
+
         elif table_id == 3:
             self.ack_table.setdefault(ipv4,0)
             self.ack_table[ipv4]=packet_count
@@ -130,8 +157,6 @@ class test_RyuApp(app_manager.RyuApp):
     # TODO : Detect & drop packets
     def _detect(self,datapath):
         
-        #print("sa ",self.sa_table)
-        #print("ack ",self.ack_table)
         
         # TODO : wheather synack packets > 50
         total = 0
@@ -143,9 +168,26 @@ class test_RyuApp(app_manager.RyuApp):
         if total<self.sa_max_num:
             return
         
+        
+        print("sa ",self.sa_table)
+        print("ack ",self.ack_table)
+        
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        
+
+        safe = {}
+        for ip in self.A_net:
+            safe.setdefault(ip,{})
+        for ip in self.B_net:
+            temp = ip.split(".")
+            safe.setdefault(temp[0],{})
+            safe[temp[0]].setdefault(temp[1],{})
+        for ip in self.C_net:
+            temp = ip.split(".")
+            safe.setdefault(temp[0],{})
+            safe[temp[0]].setdefault(temp[1],{})
+            safe[temp[0]][temp[1]].setdefault(temp[2],{})
+
 
         # TODO : wheather ip is safe.
         for ip in self.ack_table.keys():
@@ -159,33 +201,156 @@ class test_RyuApp(app_manager.RyuApp):
                 self.unsafe_C[temp[0]][temp[1]][temp[2]] += 1
             
             elif self.ack_table[ip] > 0 and self.sa_table[ip] >= 0:
-                self.safe.setdefault(temp[0],{})
-                self.safe[temp[0]].setdefault(temp[1],{})
-                self.safe[temp[0]][temp[1]].setdefault(temp[2],{})
-                self.safe[temp[0]][temp[1]][temp[2]].setdefault(temp[3],None)   
-        
+                safe.setdefault(temp[0],{})
+                safe[temp[0]].setdefault(temp[1],{})
+                safe[temp[0]][temp[1]].setdefault(temp[2],{})
+                safe[temp[0]][temp[1]][temp[2]].setdefault(temp[3],None)   
+                
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip)
+            self.del_flow(datapath,2,1,match)
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x10,ipv4_src = ip)
+            self.del_flow(datapath,3,1,match)
+ 
+
         print("unsafe ",self.unsafe_C)        
-        print("safe ",self.safe)
+        print("safe ",safe)
         
         # TODO : merge groups.
-        for a in self.safe.keys():
-            for b in self.safe[a].keys():
-                for c in self.safe[a][b].keys():
-                    if len(self.safe[a][b][c]) > 0:
-                        for d in self.safe[a][b][c].keys():
-                            del self.safe[a][b][c][d]
-        for a in self.safe.keys():
-            for b in self.safe[a].keys():
-                if len(self.safe[a][b]) >= 3:
-                        for c in self.safe[a][b].keys():
-                            del self.safe[a][b][c]
-        for a in self.safe.keys():
-                if len(self.safe[a]) >= 3:
-                        for b in self.safe[a].keys():
-                            del self.safe[a][b]
+        for a in safe.keys():
+            for b in safe[a].keys():
+                for c in safe[a][b].keys():
+                    if len(safe[a][b][c]) > 0:
+                        safe[a][b][c].clear()
 
-        print ("SAFE ",self.safe)
-    
+        for a in safe.keys():
+            for b in safe[a].keys():
+                if len(safe[a][b]) >= 3:
+                    safe[a][b].clear()
+
+        for a in safe.keys():
+            count = 0
+            for b in safe[a].keys():
+                if len(safe[a][b]) == 0:
+                    count += 1
+            if count >=3:
+                safe[a].clear()
+
+        print ("SAFE ",safe)
+        
+        C_arr = []
+        B_arr = []
+        A_arr = []
+        
+        for a in safe.keys():
+            for b in safe[a].keys():
+                for c in safe[a][b].keys():
+                    ip_str = a+"."+b+"."+c
+                    C_arr.append (ip_str)
+
+                if len(safe[a][b]) == 0:
+                    ip_str = a+"."+b
+                    B_arr.append (ip_str)
+            
+            if len(safe[a]) == 0:
+                ip_str = a
+                A_arr.append(ip_str)
+        
+        print("arr ",A_arr,B_arr,C_arr)
+        print("net ",self.A_net,self.B_net,self.C_net)
+
+        # delete net rules.
+        arr = []
+        for value in self.C_net:
+            if value not in C_arr:
+                arr.append(value)      
+                ip_str = value+".0/24"
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip_str)
+                self.del_flow(datapath,1,1,match)
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip_str)
+                self.del_flow(datapath,2,1,match)
+        
+        for value in arr:
+            self.C_net.remove(value)
+        
+        arr = []
+        for value in self.B_net:
+            if value not in B_arr:
+                arr.append(value)      
+                ip_str = value+".0.0/16"
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip_str)
+                self.del_flow(datapath,1,1,match)
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip_str)
+                self.del_flow(datapath,2,1,match)
+
+        for value in arr:
+            self.B_net.remove(value)
+        
+        arr = []
+        for value in self.A_net:
+            if value not in A_arr:
+                arr.append(value)
+                ip_str = value+".0.0.0/8"
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip_str)
+                self.del_flow(datapath,1,1,match)
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip_str)
+                self.del_flow(datapath,2,1,match)
+        
+        for value in arr:
+            self.A_net.remove(value)
+ 
+        # add net rules.
+        for value in C_arr:
+            if value not in self.C_net:
+                self.C_net.append(value) 
+                ip_str = value+".0/24"
+                # fin table
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip_str)
+                inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 20,cookie = 1,match = match,instructions = inst)
+                datapath.send_msg(mod)
+
+                # syn/ack table
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip_str)
+                inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                mod = parser.OFPFlowMod(datapath = datapath,table_id=2,priority = 20,cookie = 1,match = match,instructions = inst)
+                datapath.send_msg(mod)
+
+        for value in B_arr:
+            if value not in self.B_net:
+                self.B_net.append(value) 
+                ip_str = value+".0.0/16"
+                # fin table
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip_str)
+                inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 20,cookie = 1,match = match,instructions = inst)
+                datapath.send_msg(mod)
+
+                # syn/ack table
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip_str)
+                inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                mod = parser.OFPFlowMod(datapath = datapath,table_id=2,priority = 20,cookie = 1,match = match,instructions = inst)
+                datapath.send_msg(mod)
+
+        for value in A_arr:
+            if value not in self.A_net:
+                self.A_net.append(value) 
+                ip_str = value+".0.0.0/8"
+                # fin table
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip_str)
+                inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 20,cookie = 1,match = match,instructions = inst)
+                datapath.send_msg(mod)
+
+                # syn/ack table
+                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip_str)
+                inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                mod = parser.OFPFlowMod(datapath = datapath,table_id=2,priority = 20,cookie = 1,match = match,instructions = inst)
+                datapath.send_msg(mod)
+
+        print ("A net ",self.A_net)
+        print ("B net ",self.B_net)
+        print ("C net ",self.C_net)
+
     #TODO : Add rules.
     def add_flow(self,datapath,table_id,cookie,cookie_mask,priority,match,actions):
         ofproto = datapath.ofproto
@@ -195,12 +360,16 @@ class test_RyuApp(app_manager.RyuApp):
         datapath.send_msg(mod)
 
     # TODO : Delete rules.
-    def del_flow(self,datapath,table_id,cookie,cookie_mask):
+    def del_flow(self,datapath,table_id,cookie,match):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+
+        #print(match)
         
-        mod = parser.OFPFlowMod(datapath = datapath,command=ofproto.OFPFC_DELETE,cookie=cookie,cookie_mask=cookie_mask,table_id=table_id,out_port=ofproto.OFPP_ANY,out_group=ofproto.OFPG_ANY)
+        mod = parser.OFPFlowMod(datapath = datapath,command=ofproto.OFPFC_DELETE,cookie=cookie,cookie_mask = 0xFFFFFFFFFFFFFFFF,table_id=table_id,match=match,out_port=ofproto.OFPP_ANY,out_group=ofproto.OFPG_ANY)
+        
         #table_id=ofproto.OFPTT_ALL
+        
         datapath.send_msg(mod)
     
     # TODO : Modify rules.
@@ -221,10 +390,10 @@ class test_RyuApp(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         
-        # TODO: Match SYN SYN/ACK ACK packets.
+        # TODO: Match FIN SYN/ACK ACK packets.
         if datapath.id == 1:
-            # SYN
-            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02)
+            # FIN
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11)
             inst = [parser.OFPInstructionGotoTable(table_id=1)]
             mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 3,match = match,instructions = inst)
             datapath.send_msg(mod)
@@ -238,7 +407,7 @@ class test_RyuApp(app_manager.RyuApp):
             # ACK
             match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x10)
             inst = [parser.OFPInstructionGotoTable(table_id=3)]
-            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 1,match = match,instructions = inst)
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 3,match = match,instructions = inst)
             datapath.send_msg(mod)
 
             match = parser.OFPMatch()
@@ -246,7 +415,7 @@ class test_RyuApp(app_manager.RyuApp):
             mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 0,match = match,instructions = inst)
             datapath.send_msg(mod)
 
-            # TODO: syn table.
+            # TODO: fin table.
             match = parser.OFPMatch()
             inst = [parser.OFPInstructionGotoTable(table_id=4)]
             mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 0,match = match,instructions = inst)
