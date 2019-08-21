@@ -26,12 +26,10 @@ class test_RyuApp(app_manager.RyuApp):
         self.sa_table = {}
         self.ack_table = {}
 
-        self.sa_flag = False
-        self.ack_flag = False
 
-        self.sa_max_num = 5
+        self.sa_max_num = 50
         self.unsafe_C = {}
-        self.safe_C = {}
+        self.safe = {}
 
         ## Monitor
         self.time = 5
@@ -83,8 +81,9 @@ class test_RyuApp(app_manager.RyuApp):
         
         self.sa_table.clear()
         self.ack_table.clear()
-        self.sa_flag = False
-        self.ack_flag = False
+        #self.unsafe_C.clear()
+        #self.safe.clear()
+
 
         req = parser.OFPFlowStatsRequest(datapath = datapath,table_id = 2)
         datapath.send_msg(req)
@@ -97,7 +96,6 @@ class test_RyuApp(app_manager.RyuApp):
         body = ev.msg.body
         
         if ev.msg.datapath.id == 1:
-
             self.logger.info("datapath "
                   "table_id "
                   "ip               "
@@ -106,7 +104,6 @@ class test_RyuApp(app_manager.RyuApp):
                   "-------- "
                   "---------------- "
                   "------------ ")
-
             if body[0].table_id==2 :
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_dst'])):
@@ -117,38 +114,35 @@ class test_RyuApp(app_manager.RyuApp):
                                    key=lambda flow: (flow.match['ipv4_src'])):
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
                     self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
-     
+            if self.sa_table and self.ack_table:
+                self._detect(ev.msg.datapath)
 
     # TODO : Calculate Syn/ack & ACK
     def _collect(self,datapath,table_id,ipv4,packet_count):
 
         if table_id == 2:
-            self.sa_table.setdefault(ipv4,None)
+            self.sa_table.setdefault(ipv4,0)
             self.sa_table[ipv4]=packet_count
-            self.sa_flag=True
-            #self.logger.info('sa_table',self.sa_table)
         elif table_id == 3:
-            self.ack_table.setdefault(ipv4,None)
+            self.ack_table.setdefault(ipv4,0)
             self.ack_table[ipv4]=packet_count
-            self.ack_flag=True
-            #self.logger.info('ack_table',self.ack_table)
-        if self.sa_flag and self.ack_flag:
-            self._detect(datapath)
-
 
     # TODO : Detect & drop packets
     def _detect(self,datapath):
         
+        #print("sa ",self.sa_table)
+        #print("ack ",self.ack_table)
+        
         # TODO : wheather synack packets > 50
         total = 0
         
+        
         for ip in self.sa_table.keys():
             total += self.sa_table[ip]
-            #print(total)
 
         if total<self.sa_max_num:
             return
-
+        
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         
@@ -161,30 +155,38 @@ class test_RyuApp(app_manager.RyuApp):
             if self.ack_table[ip] == 0 and self.sa_table[ip] > 0:
                 self.unsafe_C.setdefault(temp[0],{})
                 self.unsafe_C[temp[0]].setdefault(temp[1],{})
-                self.unsafe_C[temp[0]][temp[1]].setdefault(temp[2],{})
-                self.unsafe_C[temp[0]][temp[1]][temp[2]].setdefault(temp[3],None)
-                #print("unsafe ",self.unsafe_C)
+                self.unsafe_C[temp[0]][temp[1]].setdefault(temp[2],0)
+                self.unsafe_C[temp[0]][temp[1]][temp[2]] += 1
             
             elif self.ack_table[ip] > 0 and self.sa_table[ip] >= 0:
-                self.safe_C.setdefault(temp[0],{})
-                self.safe_C[temp[0]].setdefault(temp[1],{})
-                self.safe_C[temp[0]][temp[1]].setdefault(temp[2],{})
-                self.safe_C[temp[0]][temp[1]][temp[2]].setdefault(temp[3],None)   
-                #print("safe ",self.safe_C)
-            
+                self.safe.setdefault(temp[0],{})
+                self.safe[temp[0]].setdefault(temp[1],{})
+                self.safe[temp[0]][temp[1]].setdefault(temp[2],{})
+                self.safe[temp[0]][temp[1]][temp[2]].setdefault(temp[3],None)   
+        
+        print("unsafe ",self.unsafe_C)        
+        print("safe ",self.safe)
+        
+        # TODO : merge groups.
+        for a in self.safe.keys():
+            for b in self.safe[a].keys():
+                for c in self.safe[a][b].keys():
+                    if len(self.safe[a][b][c]) > 0:
+                        for d in self.safe[a][b][c].keys():
+                            del self.safe[a][b][c][d]
+        for a in self.safe.keys():
+            for b in self.safe[a].keys():
+                if len(self.safe[a][b]) >= 3:
+                        for c in self.safe[a][b].keys():
+                            del self.safe[a][b][c]
+        for a in self.safe.keys():
+                if len(self.safe[a]) >= 3:
+                        for b in self.safe[a].keys():
+                            del self.safe[a][b]
 
-            """
-            if self.syn_table.has_key(ip) == False and self.ack_table[ip] == 0 and self.sa_table[ip] > 0:
-                
-                self.syn_table.setdefault(ip,None)
-                
-                print(datapath.id)
-                match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02,ipv4_src=ip)
-                inst = []
-                mod = parser.OFPFlowMod(datapath = datapath,table_id=1,cookie=1,cookie_mask=0,priority = 1,match = match,instructions = inst)
-                datapath.send_msg(mod)
-                """
-    # TODO : Add rules.
+        print ("SAFE ",self.safe)
+    
+    #TODO : Add rules.
     def add_flow(self,datapath,table_id,cookie,cookie_mask,priority,match,actions):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
