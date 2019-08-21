@@ -32,7 +32,7 @@ class test_RyuApp(app_manager.RyuApp):
         self.A_net = []
 
         self.sa_max_num = 10
-        self.unsafe_C = {}
+        #self.unsafe_C = {}
         #self.safe = {}
 
         ## Monitor
@@ -112,6 +112,7 @@ class test_RyuApp(app_manager.RyuApp):
                   "-------- "
                   "---------------- "
                   "------------ ")
+
             if body[0].table_id==1 :
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_src'])):
@@ -136,6 +137,21 @@ class test_RyuApp(app_manager.RyuApp):
                                    key=lambda flow: (flow.match['ipv4_src'])):
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
                     self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
+            datapath = ev.msg.datapath
+            ofproto = ev.msg.datapath.ofproto
+            parser = ev.msg.datapath.ofproto_parser
+
+            if self.fin_table and self.sa2_table:
+                for ip in self.fin_table:
+                    if self.fin_table[ip] > 0:
+                        if (self.sa2_table[ip]-self.fin_table[ip])/self.fin_table[ip] >= 1.1:
+                            print("Attack!",ip)
+                            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip )
+                            self.del_flow(datapath,1,1,match)
+                            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip )
+                            self.del_flow(datapath,2,1,match)
+ 
+
             if self.sa_table and self.ack_table:
                 self._detect(ev.msg.datapath)
 
@@ -157,7 +173,7 @@ class test_RyuApp(app_manager.RyuApp):
     # TODO : Detect & drop packets
     def _detect(self,datapath):
         
-        
+
         # TODO : wheather synack packets > 50
         total = 0
         
@@ -190,15 +206,18 @@ class test_RyuApp(app_manager.RyuApp):
 
 
         # TODO : wheather ip is safe.
+
+        unsafe_C = {}
+        
         for ip in self.ack_table.keys():
 
             temp = ip.split(".")
             
             if self.ack_table[ip] == 0 and self.sa_table[ip] > 0:
-                self.unsafe_C.setdefault(temp[0],{})
-                self.unsafe_C[temp[0]].setdefault(temp[1],{})
-                self.unsafe_C[temp[0]][temp[1]].setdefault(temp[2],0)
-                self.unsafe_C[temp[0]][temp[1]][temp[2]] += 1
+                ip_str = temp[0]+"."+temp[1]+"."+temp[2]
+                unsafe_C.setdefault(ip_str,0)
+                unsafe_C[ip_str] += 1
+                
             
             elif self.ack_table[ip] > 0 and self.sa_table[ip] >= 0:
                 safe.setdefault(temp[0],{})
@@ -212,9 +231,17 @@ class test_RyuApp(app_manager.RyuApp):
             self.del_flow(datapath,3,1,match)
  
 
-        print("unsafe ",self.unsafe_C)        
+        print("unsafe ",unsafe_C)        
         print("safe ",safe)
         
+        # TODO : drop attacker's sun packets.
+        for ip in unsafe_C:
+            ip_str = ip + ".0/24"
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02,ipv4_src = ip_str)
+            inst = []
+            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 20,cookie = 1,match = match,instructions = inst)
+            datapath.send_msg(mod)
+
         # TODO : merge groups.
         for a in safe.keys():
             for b in safe[a].keys():

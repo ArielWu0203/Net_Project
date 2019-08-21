@@ -13,6 +13,8 @@ def MininetTopo(argv):
     net = Mininet()
 
     info("Create host nodes.\n")
+    
+
     count = 1
     hostlist = []
     for i in range(1,4):
@@ -23,6 +25,7 @@ def MininetTopo(argv):
             hostlist.append (net.addHost(hostname,ip=ip_str,mac=mac_str))
             count+=1
     server = net.addHost('server',ip="10.0.1.10/8",mac="00:00:00:00:00:15")
+    attacker = net.addHost('attacker',ip="11.1.1.11/8",mac="00:00:00:00:00:16")
     
     for i in range(1,4):
         hostname = "h"+str(count)
@@ -54,6 +57,9 @@ def MininetTopo(argv):
     net.addLink(s1,r1)
     for i in range(0,9):
         net.addLink(hostlist[i],s2)
+
+    net.addLink(attacker,s2)
+
     net.addLink(s2,r2)
     net.addLink(r1,r2)
     net.addLink(s5,r2)
@@ -91,6 +97,8 @@ def MininetTopo(argv):
     
     for i in range(0,9):
       hostlist[i].cmd("ip route add default via 11.0.2.1")
+    
+    attacker.cmd("ip route add default via 11.0.2.1")
 
     server.cmd("ip route add default via 10.0.1.1")
     
@@ -103,15 +111,16 @@ def MininetTopo(argv):
     server.cmdPrint("python -m SimpleHTTPServer 80 &")
     time.sleep(3)
     
-    hostlist[12].cmd("xterm &")
+    attacker.cmdPrint('xterm &')
+    #s1.cmdPrint('xterm &')
 
-    
+
     while True:
-        for i in range(0,13):
+        for i in range(0,3):
             hostlist[i].cmdPrint('curl 10.0.1.10 &')
-        time.sleep(3)
 
-
+        time.sleep(10)
+    
     info("Run mininet CLI.\n")
     CLI(net)
 
