@@ -144,7 +144,7 @@ class tran_RyuApp(app_manager.RyuApp):
                 print("Attack! ",ip)
                 match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02,ipv4_src = ip)
                 inst = []
-                mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 20,cookie = 1,match = match,instructions = inst)
+                mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 20,cookie = 1,match = match,instructions = inst)
                 datapath.send_msg(mod)
 
 
@@ -189,8 +189,8 @@ class tran_RyuApp(app_manager.RyuApp):
         
         # TODO: Match FIN SYN/ACK ACK packets.
         if datapath.id == 1:
-            # FIN
-            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11)
+            # Syn
+            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02)
             inst = [parser.OFPInstructionGotoTable(table_id=1)]
             mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 3,match = match,instructions = inst)
             datapath.send_msg(mod)
@@ -212,7 +212,7 @@ class tran_RyuApp(app_manager.RyuApp):
             mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 0,match = match,instructions = inst)
             datapath.send_msg(mod)
 
-            # TODO: fin table.
+            # TODO: syn table.
             match = parser.OFPMatch()
             inst = [parser.OFPInstructionGotoTable(table_id=4)]
             mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 0,match = match,instructions = inst)
