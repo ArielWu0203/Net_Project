@@ -234,13 +234,13 @@ class test_RyuApp(app_manager.RyuApp):
         print("unsafe ",unsafe_C)        
         print("safe ",safe)
         
-        # TODO : drop attacker's sun packets.
+        # TODO : drop attacker's syn packets.
         for ip in unsafe_C:
             ip_str = ip + ".0/24"
             match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x02,ipv4_src = ip_str)
             inst = []
-            mod = parser.OFPFlowMod(datapath = datapath,table_id=0,priority = 20,cookie = 1,match = match,instructions = inst)
-            datapath.send_msg(mod)
+            mod = parser.OFPFlowMod(datapath = self.datapaths[2],table_id=0,priority = 20,cookie = 1,match = match,instructions = inst)
+            self.datapaths[2].send_msg(mod)
 
         # TODO : merge groups.
         for a in safe.keys():
