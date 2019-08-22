@@ -36,7 +36,7 @@ class test_RyuApp(app_manager.RyuApp):
         #self.safe = {}
 
         ## Monitor
-        self.time = 5
+        self.time = 1
         self.monitor_thread = hub.spawn(self._monitor)
  
         ## Clean
@@ -137,20 +137,35 @@ class test_RyuApp(app_manager.RyuApp):
                                    key=lambda flow: (flow.match['ipv4_src'])):
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
                     self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
+            
             datapath = ev.msg.datapath
             ofproto = ev.msg.datapath.ofproto
             parser = ev.msg.datapath.ofproto_parser
 
             if self.fin_table and self.sa2_table:
-                for ip in self.fin_table:
-                    if self.fin_table[ip] > 0:
-                        if (self.sa2_table[ip]-self.fin_table[ip])/self.fin_table[ip] >= 1.1:
+                #print("sa ", self.sa2_table)
+                #print("fin ", self.fin_table)
+
+                for ip in self.sa2_table:
+                    if self.sa2_table[ip] >= 20:
+                        if (self.sa2_table[ip]-self.fin_table[ip]) >= 2:
                             print("Attack!",ip)
                             match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip )
                             self.del_flow(datapath,1,1,match)
                             match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip )
                             self.del_flow(datapath,2,1,match)
- 
+                        else:
+                            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip )
+                            self.del_flow(datapath,1,1,match)
+                            inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                            mod = parser.OFPFlowMod(datapath = datapath,table_id=1,priority = 20,cookie = 1,match = match,instructions = inst)
+                            datapath.send_msg(mod)
+
+                            match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x12,ipv4_dst = ip )
+                            self.del_flow(datapath,2,1,match)
+                            inst = [parser.OFPInstructionGotoTable(table_id=4)]
+                            mod = parser.OFPFlowMod(datapath = datapath,table_id=2,priority = 20,cookie = 1,match = match,instructions = inst)
+                            datapath.send_msg(mod)
 
             if self.sa_table and self.ack_table:
                 self._detect(ev.msg.datapath)

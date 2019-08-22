@@ -73,7 +73,7 @@ def MininetTopo(argv):
     net.build()
     c0.start()
     s1.start([c0])
-    s2.start([])
+    s2.start([c0])
     s5.start([])
 
     r1.cmd("ifconfig r1-eth0 0")
@@ -112,15 +112,12 @@ def MininetTopo(argv):
     time.sleep(3)
     
     attacker.cmdPrint('xterm &')
-    #s1.cmdPrint('xterm &')
-
 
     while True:
-        for i in range(0,3):
+        for i in range(0,9):
             hostlist[i].cmdPrint('curl 10.0.1.10 &')
-
-        time.sleep(10)
-    
+        time.sleep(5)
+        
     info("Run mininet CLI.\n")
     CLI(net)
 
