@@ -38,11 +38,11 @@ class test_RyuApp(app_manager.RyuApp):
         #self.safe = {}
 
         ## Monitor
-        self.time = 5
+        self.time = 1
         self.monitor_thread = hub.spawn(self._monitor)
  
         ## Monitor packets
-        self.count_time = 1
+        self.count_time = 6
         self.count_thread = hub.spawn(self._count)
 
         ## Clean
