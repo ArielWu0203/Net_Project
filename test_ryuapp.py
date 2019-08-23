@@ -34,6 +34,8 @@ class test_RyuApp(app_manager.RyuApp):
         self.sa_max_num = 30
         self.packet_num = 0
 
+        self.entry = 0
+
         #self.unsafe_C = {}
         #self.safe = {}
 
@@ -127,13 +129,17 @@ class test_RyuApp(app_manager.RyuApp):
     # TODO : Reply port stats
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def _port_stats_reply_handler(self, ev):
+        
         body = ev.msg.body
         
         num =  0
         for stat in sorted(body, key=attrgetter('port_no')):
             num += stat.rx_bytes
-        print("num-packets ",num-self.packet_num)
+        #print("num-packets ",num-self.packet_num)
         self.packet_num = num
+
+        print("entry ",self.entry)
+        self.entry = 0
     
     # TODO : Reply flow stats
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
@@ -141,6 +147,7 @@ class test_RyuApp(app_manager.RyuApp):
         body = ev.msg.body
         
         if ev.msg.datapath.id == 1:
+            total = 0
             """
             self.logger.info("datapath "
                   "table_id "
@@ -154,15 +161,23 @@ class test_RyuApp(app_manager.RyuApp):
             if body[0].table_id==1 :
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_src'])):
+                    
+                    total+=1
+                    
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
                     #self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
             elif body[0].table_id==2 :
                 for stat in sorted([flow for flow in body if flow.priority > 0 and flow.priority < 10],
                                    key=lambda flow: (flow.match['ipv4_dst'])):
+                    
+                    total+=1
+                    
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_dst'],stat.packet_count)
                     #self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_dst'],stat.packet_count))
                 for stat in sorted([flow for flow in body if flow.priority > 10],
                                    key=lambda flow: (flow.match['ipv4_dst'])):
+                    
+                    total+=1
                     
                     ipv4 =  stat.match['ipv4_dst']
                     self.sa2_table.setdefault(ipv4,0)
@@ -173,9 +188,13 @@ class test_RyuApp(app_manager.RyuApp):
             elif body[0].table_id==3:
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_src'])):
+                    total+=1
+                    
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
                     #self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
             
+            self.entry += total
+
             datapath = ev.msg.datapath
             ofproto = ev.msg.datapath.ofproto
             parser = ev.msg.datapath.ofproto_parser
