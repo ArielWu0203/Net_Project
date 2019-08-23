@@ -28,7 +28,7 @@ class tran_RyuApp(app_manager.RyuApp):
         self.packet_num = 0
 
         ## Monitor
-        self.time = 1
+        self.time = 5
         self.monitor_thread = hub.spawn(self._monitor)
 
         ## Monitor packets

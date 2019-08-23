@@ -31,18 +31,18 @@ class test_RyuApp(app_manager.RyuApp):
         self.B_net = []
         self.A_net = []
 
-        self.sa_max_num = 10
+        self.sa_max_num = 30
         self.packet_num = 0
 
         #self.unsafe_C = {}
         #self.safe = {}
 
         ## Monitor
-        self.time = 1
+        self.time = 5
         self.monitor_thread = hub.spawn(self._monitor)
  
         ## Monitor packets
-        self.count_time = 10
+        self.count_time = 1
         self.count_thread = hub.spawn(self._count)
 
         ## Clean
@@ -185,8 +185,8 @@ class test_RyuApp(app_manager.RyuApp):
                 #print("fin ", self.fin_table)
 
                 for ip in self.sa2_table:
-                    if self.sa2_table[ip] >= 20:
-                        if (self.sa2_table[ip]-self.fin_table[ip]) >= 2:
+                    if self.sa2_table[ip] >= 30:
+                        if (self.sa2_table[ip]-self.fin_table[ip]) >= 3:
                             print("Attack!",ip)
                             match = parser.OFPMatch(eth_type = 0x0800,ip_proto=6,tcp_flags=0x11,ipv4_src = ip )
                             self.del_flow(datapath,1,1,match)
