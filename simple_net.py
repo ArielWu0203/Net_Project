@@ -33,7 +33,7 @@ def MininetTopo(argv):
     switch = []
     for i in range(1,number+1):
         switch_name = "s" + str(i)
-        switch.append(net.addSwitch(switch_name,switch = OVSSwitch,failMode = 'secure',protocols = 'OpenFlow13'))
+        switch.append(net.addSwitch(switch_name,switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13'))
 
     info("Create Links.\n")
     net.addLink(h1,switch[0])
@@ -41,9 +41,8 @@ def MininetTopo(argv):
     for i in range(number-1):
         net.addLink(switch[i],switch[i+1])
 
-    info("Create Controller.\n")
-    net.addController(name = 'c0',controller = RemoteController,ip = '127.0.0.1',port = 6633)
-
+    h1.cmdPrint("python -m SimpleHTTPServer 80 &")
+    
     info("Build and start network.\n")
     net.build()
     net.start()

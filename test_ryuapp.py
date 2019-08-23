@@ -32,6 +32,8 @@ class test_RyuApp(app_manager.RyuApp):
         self.A_net = []
 
         self.sa_max_num = 10
+        self.packet_num = 0
+
         #self.unsafe_C = {}
         #self.safe = {}
 
@@ -39,6 +41,10 @@ class test_RyuApp(app_manager.RyuApp):
         self.time = 1
         self.monitor_thread = hub.spawn(self._monitor)
  
+        ## Monitor packets
+        self.count_time = 10
+        self.count_thread = hub.spawn(self._count)
+
         ## Clean
         self.clean_time = 120
         #self.clean_thread = hub.spawn(self._clean)
@@ -77,12 +83,32 @@ class test_RyuApp(app_manager.RyuApp):
                     self._request_stats(dp)
             hub.sleep(self.time)
 
+    # TODO : Count
+    def _count(self):
+        while True:
+            for dp in self.datapaths.values():
+                if dp.id == 1:
+                    self._request_port_stats(dp)
+            hub.sleep(self.count_time)
+
+    # TODO : Request port stats
+    def _request_port_stats(self,datapath):
+        
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        
+        # port stats
+        req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
+        datapath.send_msg(req)
+
+   
     # TODO : Request flow stats
     def _request_stats(self,datapath):
         self.logger.debug('send flow stats request : %016x',datapath.id)
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         
+        # flow stats
         self.sa_table.clear()
         self.ack_table.clear()
         self.fin_table.clear()
@@ -98,12 +124,24 @@ class test_RyuApp(app_manager.RyuApp):
         req = parser.OFPFlowStatsRequest(datapath = datapath,table_id = 3)
         datapath.send_msg(req)
 
+    # TODO : Reply port stats
+    @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
+    def _port_stats_reply_handler(self, ev):
+        body = ev.msg.body
+        
+        num =  0
+        for stat in sorted(body, key=attrgetter('port_no')):
+            num += stat.rx_bytes
+        print("num-packets ",num-self.packet_num)
+        self.packet_num = num
+    
     # TODO : Reply flow stats
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def _flow_stats_reply_handler(self, ev):
         body = ev.msg.body
         
         if ev.msg.datapath.id == 1:
+            """
             self.logger.info("datapath "
                   "table_id "
                   "ip               "
@@ -112,17 +150,17 @@ class test_RyuApp(app_manager.RyuApp):
                   "-------- "
                   "---------------- "
                   "------------ ")
-
+            """
             if body[0].table_id==1 :
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_src'])):
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
-                    self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
+                    #self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
             elif body[0].table_id==2 :
                 for stat in sorted([flow for flow in body if flow.priority > 0 and flow.priority < 10],
                                    key=lambda flow: (flow.match['ipv4_dst'])):
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_dst'],stat.packet_count)
-                    self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_dst'],stat.packet_count))
+                    #self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_dst'],stat.packet_count))
                 for stat in sorted([flow for flow in body if flow.priority > 10],
                                    key=lambda flow: (flow.match['ipv4_dst'])):
                     
@@ -130,13 +168,13 @@ class test_RyuApp(app_manager.RyuApp):
                     self.sa2_table.setdefault(ipv4,0)
                     self.sa2_table[ipv4]=stat.packet_count
                     #print("sa2_table ",self.sa2_table)
-                    self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_dst'],stat.packet_count))
+                    #self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_dst'],stat.packet_count))
  
             elif body[0].table_id==3:
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_src'])):
                     self._collect(ev.msg.datapath,stat.table_id,stat.match['ipv4_src'],stat.packet_count)
-                    self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
+                    #self.logger.info("%08d %08d %16s %08d " %(ev.msg.datapath.id,stat.table_id,stat.match['ipv4_src'],stat.packet_count))
             
             datapath = ev.msg.datapath
             ofproto = ev.msg.datapath.ofproto
@@ -200,8 +238,8 @@ class test_RyuApp(app_manager.RyuApp):
             return
         
         
-        print("sa ",self.sa_table)
-        print("ack ",self.ack_table)
+        #print("sa ",self.sa_table)
+        #print("ack ",self.ack_table)
         
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -246,8 +284,8 @@ class test_RyuApp(app_manager.RyuApp):
             self.del_flow(datapath,3,1,match)
  
 
-        print("unsafe ",unsafe_C)        
-        print("safe ",safe)
+        #print("unsafe ",unsafe_C)        
+        #print("safe ",safe)
         
         # TODO : drop attacker's syn packets.
         for ip in unsafe_C:
@@ -277,7 +315,7 @@ class test_RyuApp(app_manager.RyuApp):
             if count >=3:
                 safe[a].clear()
 
-        print ("SAFE ",safe)
+        #print ("SAFE ",safe)
         
         C_arr = []
         B_arr = []
@@ -297,8 +335,8 @@ class test_RyuApp(app_manager.RyuApp):
                 ip_str = a
                 A_arr.append(ip_str)
         
-        print("arr ",A_arr,B_arr,C_arr)
-        print("net ",self.A_net,self.B_net,self.C_net)
+        #print("arr ",A_arr,B_arr,C_arr)
+        #print("net ",self.A_net,self.B_net,self.C_net)
 
         # delete net rules.
         arr = []

@@ -20,7 +20,7 @@ def MininetTopo(argv):
 
 
     info("Create switch node.\n")
-    s1 = net.addSwitch('s1',switch = OVSSwitch,failMode = 'secure',protocols = 'OpenFlow13')
+    s1 = net.addSwitch('s1',switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13')
     s2 = net.addSwitch('s2',switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13')
     s3 = net.addSwitch('s3',switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13')
     s4 = net.addSwitch('s4',switch = OVSSwitch,failMode = 'standalone',protocols = 'OpenFlow13')
@@ -46,7 +46,7 @@ def MininetTopo(argv):
     info("Build and start network.\n")
     net.build()
     c0.start()
-    s1.start([c0])
+    s1.start([])
     s2.start([])
     s3.start([])
     s4.start([])
