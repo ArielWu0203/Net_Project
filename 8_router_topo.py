@@ -116,7 +116,7 @@ def MininetTopo(argv):
     while True:
         for i in range(0,9):
             hostlist[i].cmdPrint('curl 10.0.1.10 &')
-        time.sleep(5)
+        time.sleep(3)
         
     info("Run mininet CLI.\n")
     CLI(net)
