@@ -32,7 +32,7 @@ class tran_RyuApp(app_manager.RyuApp):
         self.monitor_thread = hub.spawn(self._monitor)
 
         ## Monitor packets
-        self.count_time = 6
+        self.count_time = 30
         self.count_thread = hub.spawn(self._count)
 
         ## Clean
