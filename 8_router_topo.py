@@ -7,6 +7,9 @@ from mininet.log import setLogLevel, info
 from mininet.node import RemoteController, OVSSwitch
 import sys, getopt
 import time
+import threading
+
+t = time.time()
 
 def MininetTopo(argv):
 
@@ -14,13 +17,16 @@ def MininetTopo(argv):
 
     info("Create host nodes.\n")
     
+    host_ip = []
 
     hostlist = []
     hostlist.append(net.addHost('h1',ip="11.1.4.10/8",mac="00:00:00:00:00:10"))
+    host_ip.append("11.1.4.10")
     count = 2
     for i in range(1,4):
         for j in range(1,4):
             hostname = "h"+str(count)
+            host_ip.append("11."+str(i)+"."+str(j)+".10")
             ip_str = "11."+str(i)+"."+str(j)+".10/8"
             mac_str = "00:00:00:00:00:0"+str(count-1)
             hostlist.append (net.addHost(hostname,ip=ip_str,mac=mac_str))
@@ -58,7 +64,7 @@ def MininetTopo(argv):
     net.addLink(r1,r2)
     
     info("Create Controller.\n")
-    c0 = net.addController(name = 'c0',controller = RemoteController,port = 6633)
+    #c0 = net.addController(name = 'c0',controller = RemoteController,port = 6633)
 
     info("Build and start network.\n")
     net.build()
@@ -91,25 +97,48 @@ def MininetTopo(argv):
     server.cmdPrint('cd ./file')
     server.cmdPrint("python -m SimpleHTTPServer 80 &")
     time.sleep(5)
-    s4.cmdPrint("xterm &")
     
+    #s4.cmdPrint("xterm &")
     #hostlist[0].cmdPrint("xterm &")
-    r1.cmdPrint("python sniffer.py r1 0 >r1.txt &")
-    r2.cmdPrint("python sniffer.py r2 0 >r2.txt &")
-    server.cmdPrint("python sniffer.py server 0 >server.txt &")
-    s1.cmdPrint("python sniffer.py s1 1 >s1.txt &")
-    s2.cmdPrint("python sniffer.py s2 4 >s2.txt &")
-    s3.cmdPrint("python sniffer.py s3 1 2 3 4 >s3.txt &")
-    s4.cmdPrint("python sniffer.py s4 1 2 3 >s4.txt &")
-    s5.cmdPrint("python sniffer.py s5 1 2 3 >s5.txt &")
-
-    while True:
-        for i in range(0,10):
-            hostlist[i].cmdPrint('curl 10.0.1.10 &')
-            time.sleep(0.5)
     
+    r1.cmdPrint("python sniffer.py r1 0 >"+argv[0]+"/r1.txt &")
+    r2.cmdPrint("python sniffer.py r2 0 >"+argv[0]+"/r2.txt &")
+    s1.cmdPrint("python sniffer.py s1 1 >"+argv[0]+"/s1.txt &")
+    s2.cmdPrint("python sniffer.py s2 4 >"+argv[0]+"/s2.txt &")
+    s3.cmdPrint("python sniffer.py s3 1 >"+argv[0]+"/s3.txt &")
+    s4.cmdPrint("python sniffer.py s4 1 >"+argv[0]+"/s4.txt &")
+    #s5.cmdPrint("python sniffer.py s5 1 2 3 >tran/s5.txt &")
+ 
+    t = time.time()
+    
+    normal = threading.Thread(target = normal_testing,args = ([hostlist[4]]))
+    
+    normal.start()
+    
+    attack = threading.Thread(target = attack_testing,args = ([hostlist[0]]))
+    
+    attack.start()
+
+    """
     info("Run mininet CLI.\n")
     CLI(net)
+    """
+
+def normal_testing(h):
+    while True:
+        if time.time()-t >= 240:
+            print("stop!")
+            return   
+
+        h.cmdPrint('curl 10.0.1.10 &')
+        time.sleep(20)
+
+def attack_testing(h):
+    while True:
+        if time.time()-t >= 180:
+            print("stop!")
+            return
+        h.cmd("hping3 10.0.1.10 -S -i u50000 -p 80")
 
 if __name__ == '__main__':
     setLogLevel('info')
