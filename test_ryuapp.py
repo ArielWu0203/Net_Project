@@ -96,6 +96,7 @@ class test_RyuApp(app_manager.RyuApp):
                   "---------------- "
                   "------------ ")
             """
+            
             if body[0].table_id==1 :
                 for stat in sorted([flow for flow in body if flow.priority > 0],
                                    key=lambda flow: (flow.match['ipv4_src'])):
@@ -204,6 +205,7 @@ class test_RyuApp(app_manager.RyuApp):
             temp = ip.split(".")
             
             if self.ack_table[ip] == 0 and self.sa_table[ip] > 0:
+                
                 ip_str = temp[0]+"."+temp[1]+"."+temp[2]
                 unsafe_C.setdefault(ip_str,0)
                 unsafe_C[ip_str] += 1
@@ -228,8 +230,10 @@ class test_RyuApp(app_manager.RyuApp):
             inst = []
             temp = ip_str.split(".")
             ip_str = temp[0]+ "." + temp[1]
+            
             print("ip_str",ip_str)
             print("datapath_ip",self.B_datapath_ip[ip_str])
+            
             ID = self.B_datapath_ip[ip_str]
             mod = parser.OFPFlowMod(datapath = self.datapaths[ID],table_id=0,priority = 20,cookie = 1,match = match,instructions = inst)
             self.datapaths[ID].send_msg(mod)

@@ -30,6 +30,7 @@ def calculate(files):
                 lines[i+1] = int(lines[i+1])
                 total2+=lines[i+1]
             else:
+                fp.close()
                 break
 
     print("first min: ",total)

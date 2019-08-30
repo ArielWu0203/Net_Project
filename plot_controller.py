@@ -41,7 +41,7 @@ def plot_controller(file1,file2):
     line1 = plt.plot(time,data1,'-',label = 'Openflow')
     plt.title("Data traffic of Controller")
     plt.xlabel("time(sec)")
-    plt.ylabel("Packet rate(bytes/sec)")
+    plt.ylabel("Throughput(bytes/sec)")
 
     plt.axvline(60,0,5000,linestyle='--',color = 'k')
     
